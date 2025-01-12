@@ -27,6 +27,7 @@ async function run() {
         const menuCollection = client.db("bistroDb").collection("menu");
         const reviewsCollection = client.db("bistroDb").collection("reviews");
         const cartsCollection = client.db("bistroDb").collection("carts");
+        const usersCollection = client.db("bistroDb").collection("users");
         // menu collection operations
         app.get("/menu", async (req, res) => {
             const result = await menuCollection.find().toArray();
@@ -55,7 +56,12 @@ async function run() {
             const result = await cartsCollection.deleteOne(query);
             res.send(result);
         });
-
+        // users collection operations
+        app.post("/users", async(req, res) => {
+            const user = req.body;
+            const result = await usersCollection.insertOne(user);
+            res.send(result);
+        })
 
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
