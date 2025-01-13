@@ -1,4 +1,5 @@
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
 const express = require("express");
 const cors = require("cors");
 const app = express();
@@ -28,6 +29,46 @@ async function run() {
         const reviewsCollection = client.db("bistroDb").collection("reviews");
         const cartsCollection = client.db("bistroDb").collection("carts");
         const usersCollection = client.db("bistroDb").collection("users");
+
+        // JWT related APIs
+        app.post("/jwt", (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+                expiresIn: "1h"
+            });
+            res.send({token});
+        });
+
+        // middlewares
+        const verifyToken = (req, res, next) => {
+            console.log("Inside verify token", req.headers.authorization);
+            if(!req.headers.authorization){
+                return res.status(401).send({message: "unauthorized access"});
+            }
+            const token = req.headers.authorization.split(' ')[1];
+            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+                if(err){
+                    return res.status(401).send({message: "unauthorized access"});
+                }
+                req.decoded = decoded;
+                next();
+            })
+            
+        };
+
+        // use verify admin after verifyToken
+        const verifyAdmin = async(req, res, next) => {
+            const email = req.decoded.email;
+            const query = {email: email};
+            const user = await usersCollection.findOne(query);
+            const isAdmin = user?.role === "admin";
+            if(!isAdmin){
+                return res.status(403).send({message: "forbidden access"});
+            }
+            next();
+        };
+
+
         // menu collection operations
         app.get("/menu", async (req, res) => {
             const result = await menuCollection.find().toArray();
@@ -67,18 +108,18 @@ async function run() {
             const result = await usersCollection.insertOne(user);
             res.send(result);
         });
-        app.get("/users", async (req, res) => {
+        app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result);
         });
-        app.delete("/users/:id", async(req, res) => {
+        app.delete("/users/:id", verifyAdmin, verifyToken, async(req, res) => {
             const id = req.params.id;
             const query = {_id: new ObjectId(id)};
             const result = await usersCollection.deleteOne(query);
             res.send(result);
         });
         // kono akta spcefic feild k updatae korar jonno patch use korte hoy
-        app.patch("/users/admin/:id", async(req, res) => {
+        app.patch("/users/admin/:id", verifyToken, verifyAdmin, async(req, res) => {
             const id = req.params.id;
             const filter = {_id: new ObjectId(id)};
             const updatedDoc = {
@@ -88,6 +129,20 @@ async function run() {
             }
             const result = await usersCollection.updateOne(filter, updatedDoc);
             res.send(result);
+        });
+        app.get("/users/admin/:email", verifyToken, async(req, res) => {
+            const email = req.params.email;
+            if(email !== req.decoded.email){
+                return res.status(403).send({message: "forbidden access"})
+            }
+            const query = {email: email};
+            const user = await usersCollection.findOne(query);
+            let admin = false;
+            if(user){
+                admin = user?.role === "admin"
+            }
+            res.send({admin});
+
         })
 
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
