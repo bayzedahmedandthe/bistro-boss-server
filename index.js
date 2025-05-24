@@ -11,7 +11,8 @@ const port = process.env.PORT || 5000;
 app.use(cors({
     origin: ["https://bistro-boss-3bc7d.web.app", "http://localhost:5173"],
     credentials: true
-}))
+}));
+
 app.use(express.json());
 
 
@@ -76,6 +77,7 @@ async function run() {
 
         // menu collection operations
         app.get("/menu", async (req, res) => {
+            
             const result = await menuCollection.find().toArray();
             res.send(result);
         });
