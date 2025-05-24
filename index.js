@@ -81,7 +81,7 @@ async function run() {
             const result = await menuCollection.find().toArray();
             res.send(result);
         });
-        app.post("/menu", verifyToken, verifyAdmin, async(req, res) => {
+        app.post("/menu", async(req, res) => {
             const menu = req.body;
             const result = await menuCollection.insertOne(menu);
             res.send(result);
