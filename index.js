@@ -8,7 +8,10 @@ const port = process.env.PORT || 5000;
 
 
 // middlewares
-app.use(cors());
+app.use(cors({
+    origin: ["https://bistro-boss-3bc7d.web.app", "http://localhost:5173"],
+    credentials: true
+}))
 app.use(express.json());
 
 
@@ -30,6 +33,7 @@ async function run() {
         const reviewsCollection = client.db("bistroDb").collection("reviews");
         const cartsCollection = client.db("bistroDb").collection("carts");
         const usersCollection = client.db("bistroDb").collection("users");
+        const paymentCollection = client.db("bistroDb").collection("payment");
 
         // JWT related APIs
         app.post("/jwt", (req, res) => {
@@ -42,7 +46,7 @@ async function run() {
 
         // middlewares
         const verifyToken = (req, res, next) => {
-            console.log("Inside verify token", req.headers.authorization);
+            // console.log("Inside verify token", req.headers.authorization);
             if(!req.headers.authorization){
                 return res.status(401).send({message: "unauthorized access"});
             }
@@ -191,6 +195,28 @@ async function run() {
             res.send({
                 clientSecret: paymentIntent.client_secret
             })
+        });
+
+        // payment Related APIs
+        app.post('/payment', async(req, res) => {
+            const payment = req.body;
+            const paymentResult = await paymentCollection.insertOne(payment);
+            // carefully delete each item from the cart
+            const query = {_id: {
+                $in: payment.cartIds.map(id => new ObjectId(id))
+            }};
+            const deleteResult = await cartsCollection.deleteMany(query);
+
+            res.send({paymentResult, deleteResult});
+        });
+        app.get("/payments/:email", verifyToken, async(req, res) => {
+            const email = req.params.email;
+            const query = {email: email};
+            if(req.params.email !== req.decoded.email){
+                return res.status(403).send({message: "forbidden access"})
+            }
+            const result = await paymentCollection.find(query).toArray();
+            res.send(result);
         })
 
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
@@ -204,4 +230,4 @@ app.get("/", (req, res) => {
 })
 app.listen(port, () => {
     console.log(`Bistro Boss server is running on port${port}`);
-})
+});
